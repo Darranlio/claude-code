@@ -43,6 +43,7 @@ import {
   resolveOpenAIMaxTokens,
   buildOpenAIRequestBody,
 } from './requestBody.js'
+import { getProviderModelMaxCompletionTokens } from '../../../utils/model/providers.js'
 import { recordLLMObservation } from '../../../services/langfuse/tracing.js'
 import {
   convertMessagesToLangfuse,
@@ -341,9 +342,9 @@ export async function* queryModelOpenAI(
     //     3. CLAUDE_CODE_MAX_OUTPUT_TOKENS env var (generic override)
     //     4. upperLimit default (64000)
     const { upperLimit } = getModelMaxOutputTokens(openaiModel)
-    const maxTokens = resolveOpenAIMaxTokens(
-      upperLimit,
-      options.maxOutputTokensOverride,
+    const maxTokens = Math.min(
+      resolveOpenAIMaxTokens(upperLimit, options.maxOutputTokensOverride),
+      getProviderModelMaxCompletionTokens(openaiModel) ?? Infinity,
     )
 
     // Only actual OpenAI supports prompt_cache_key. Groq/DeepSeek etc. reject it.

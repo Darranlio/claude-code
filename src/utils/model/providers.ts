@@ -217,6 +217,20 @@ export function getAllConfiguredModels(): {
 }
 
 /**
+ * Look up a model's max completion tokens from provider presets.
+ * Returns undefined for unknown models (Anthropic, OpenAI native, etc).
+ */
+export function getProviderModelMaxCompletionTokens(
+  model: string,
+): number | undefined {
+  for (const provider of [...CHINA_LLM_PROVIDERS, ...INTERNATIONAL_PROVIDERS]) {
+    const matched = provider.models.find(m => m.id === model)
+    if (matched?.maxCompletionTokens) return matched.maxCompletionTokens
+  }
+  return undefined
+}
+
+/**
  * Check if ANTHROPIC_BASE_URL is a first-party Anthropic API URL.
  * Returns true if not set (default API) or points to api.anthropic.com
  * (or api-staging.anthropic.com for ant users).

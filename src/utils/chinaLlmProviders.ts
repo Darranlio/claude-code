@@ -14,6 +14,8 @@ export type ProviderModel = {
   deprecated?: string
   strengths?: string[]
   weaknesses?: string[]
+  /** Model's actual max completion tokens (for API limit capping) */
+  maxCompletionTokens?: number
   freeQuota?: {
     requestsPerDay?: number
     tokensPerMinute?: number

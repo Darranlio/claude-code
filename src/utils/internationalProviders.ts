@@ -31,6 +31,7 @@ export const INTERNATIONAL_PROVIDERS: ProviderPreset[] = [
         strengths: ['coding', 'tool-use', 'reasoning'],
         weaknesses: [],
         freeQuota: { requestsPerDay: 14400, tokensPerMinute: 30000 },
+        maxCompletionTokens: 65536,
       },
       {
         id: 'qwen/qwen3.6-27b',
@@ -43,6 +44,7 @@ export const INTERNATIONAL_PROVIDERS: ProviderPreset[] = [
         strengths: ['coding', 'reasoning', 'chinese'],
         weaknesses: [],
         freeQuota: { requestsPerDay: 14400, tokensPerMinute: 30000 },
+        maxCompletionTokens: 32768,
       },
       {
         id: 'openai/gpt-oss-20b',
@@ -55,6 +57,7 @@ export const INTERNATIONAL_PROVIDERS: ProviderPreset[] = [
         strengths: ['coding', 'reasoning', 'tool-use'],
         weaknesses: ['smaller-model'],
         freeQuota: { requestsPerDay: 14400, tokensPerMinute: 30000 },
+        maxCompletionTokens: 65536,
       },
       {
         id: 'llama-3.3-70b-versatile',
@@ -67,6 +70,7 @@ export const INTERNATIONAL_PROVIDERS: ProviderPreset[] = [
         strengths: ['general-knowledge', 'fast'],
         weaknesses: ['limited-reasoning'],
         freeQuota: { requestsPerDay: 14400, tokensPerMinute: 30000 },
+        maxCompletionTokens: 32768,
       },
       {
         id: 'llama-3.1-8b-instant',
@@ -79,6 +83,7 @@ export const INTERNATIONAL_PROVIDERS: ProviderPreset[] = [
         strengths: ['fast', 'simple-tasks'],
         weaknesses: ['limited-reasoning', 'smaller-model'],
         freeQuota: { requestsPerDay: 14400, tokensPerMinute: 6000 },
+        maxCompletionTokens: 131072,
       },
     ],
   },
