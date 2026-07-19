@@ -1446,7 +1446,6 @@ function OAuthStatusMessage({
               cursorOffset={groqCursor}
               onChangeCursorOffset={setGroqCursor}
               columns={textInputColumns}
-              mask={PASTE_HERE_MSG}
             />
             {groqSaving && (
               <Box>
