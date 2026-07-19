@@ -192,7 +192,7 @@ export function getAllConfiguredModels(): {
   // Add configured China LLM providers
   for (const provider of CHINA_LLM_PROVIDERS) {
     const configured = providers?.[provider.id]
-    if (configured || process.env.OPENAI_API_KEY) {
+    if (configured) {
       result.push({
         providerId: provider.id,
         label: provider.label,
