@@ -83,6 +83,7 @@ import {
   shouldEnableThinkingByDefault,
   type ThinkingConfig,
 } from './utils/thinking.js'
+import { routeTask, formatAutoRouteNotice } from './utils/model/taskRouter.js'
 
 // Lazy: MessageSelector.tsx pulls React/ink; only needed for message filtering at query time
 /* eslint-disable @typescript-eslint/no-require-imports */
@@ -281,9 +282,18 @@ export class QueryEngine {
     }
 
     const initialAppState = getAppState()
-    const initialMainLoopModel = userSpecifiedModel
-      ? parseUserSpecifiedModel(userSpecifiedModel)
-      : getMainLoopModel()
+
+    // Auto-route: if enabled and no user-specified model, select best model
+    const autoRoute =
+      userSpecifiedModel == null ? routeTask(this.mutableMessages) : undefined
+    const autoRouteModel = autoRoute?.model
+    const initialMainLoopModel =
+      typeof autoRouteModel === 'string'
+        ? autoRouteModel
+        : userSpecifiedModel != null
+          ? parseUserSpecifiedModel(userSpecifiedModel)
+          : getMainLoopModel()
+    const autoRouteNotice = autoRoute ? formatAutoRouteNotice(autoRoute) : ''
 
     const initialThinkingConfig: ThinkingConfig = thinkingConfig
       ? thinkingConfig
@@ -329,6 +339,7 @@ export class QueryEngine {
         : null
 
     const systemPrompt = asSystemPrompt([
+      ...(autoRouteNotice ? [autoRouteNotice] : []),
       ...(customPrompt !== undefined ? [customPrompt] : defaultSystemPrompt),
       ...(memoryMechanicsPrompt ? [memoryMechanicsPrompt] : []),
       ...(appendSystemPrompt ? [appendSystemPrompt] : []),

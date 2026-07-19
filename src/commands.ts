@@ -243,6 +243,7 @@ import {
 import rateLimitOptions from './commands/rate-limit-options/index.js'
 import statusline from './commands/statusline.js'
 import effort from './commands/effort/index.js'
+import autoRoute from './commands/auto-route/index.js'
 // stats/index.ts re-exports usage — /stats is now an alias of /usage
 // insights.ts is 113KB (3200 lines, includes diffLines/html rendering). Lazy
 // shim defers the heavy module until /insights is actually invoked.
@@ -325,6 +326,7 @@ const COMMANDS = memoize((): Command[] => [
   contextNonInteractive,
   diff,
   doctor,
+  autoRoute,
   effort,
   exit,
   fast,
