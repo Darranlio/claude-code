@@ -47,6 +47,7 @@ import { formatDuration, formatNumber } from './utils/format.js'
 import type { FpsMetrics } from './utils/fpsTracker.js'
 import { getCanonicalName } from './utils/model/model.js'
 import { calculateUSDCost } from './utils/modelCost.js'
+import { recordQuotaUsage, getQuotaStatus } from './utils/quotaTracker.js'
 export {
   getTotalCostUSD as getTotalCost,
   getTotalDuration,
@@ -244,6 +245,26 @@ ${modelUsageDisplay}`,
   )
 }
 
+export function formatMultiProviderQuotas(): string {
+  const statuses = getQuotaStatus()
+  if (statuses.length === 0) return ''
+
+  let result = '\nFree tier quotas:'
+  for (const status of statuses) {
+    const barWidth = 10
+    const filled = Math.round((status.percentUsed / 100) * barWidth)
+    const bar = '█'.repeat(filled) + '░'.repeat(barWidth - filled)
+    const reqInfo =
+      status.quota.requestsPerDay && status.quota.tokensPerDay
+        ? `${status.used.requests.toLocaleString()} req, ${status.used.tokens.toLocaleString()} tok`
+        : status.quota.requestsPerDay
+          ? `${status.used.requests.toLocaleString()} req`
+          : `${status.used.tokens.toLocaleString()} tokens`
+    result += `\n  ${status.providerLabel} / ${status.modelLabel}: ${bar} ${Math.round(status.percentUsed)}% (${reqInfo})`
+  }
+  return chalk.dim(result)
+}
+
 function round(number: number, precision: number): number {
   return Math.round(number * precision) / precision
 }
@@ -280,9 +301,23 @@ export function addToTotalSessionCost(
   cost: number,
   usage: Usage,
   model: string,
+  providerId?: string,
 ): number {
   const modelUsage = addToTotalModelUsage(cost, usage, model)
   addToTotalCostState(cost, modelUsage, model)
+
+  // Track free tier quota usage when providerId is known
+  if (providerId) {
+    const tokens =
+      (usage.input_tokens ?? 0) +
+      (usage.output_tokens ?? 0) +
+      (usage.cache_read_input_tokens ?? 0) +
+      (usage.cache_creation_input_tokens ?? 0)
+    if (tokens > 0) {
+      recordQuotaUsage(providerId, model, tokens)
+    }
+  }
+
   if (feature('GOAL')) {
     const { getGoal, updateGoalTokens } =
       require('./services/goal/goalState.js') as typeof import('./services/goal/goalState.js')

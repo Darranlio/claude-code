@@ -24,6 +24,8 @@ import { existsSync, unlinkSync } from 'node:fs'
 import {
   getAPIProvider,
   isFirstPartyAnthropicBaseUrl,
+  resolveModelProvider,
+  type ResolvedProvider,
 } from 'src/utils/model/providers.js'
 import {
   getAttributionHeader,
@@ -703,6 +705,9 @@ export type Options = {
   fallbackModel?: string
   onStreamingFallback?: () => void
   querySource: QuerySource
+  /** Resolved per-model provider with credentials (multi-provider routing).
+   *  When set, overrides global getAPIProvider() for this query. */
+  resolvedProvider?: ResolvedProvider
   agents: AgentDefinition[]
   allowedAgentTypes?: string[]
   hasAppendSystemPrompt: boolean
@@ -1079,6 +1084,14 @@ async function* queryModel(
     return
   }
 
+  // Multi-provider routing: resolve per-model provider with credentials.
+  // Uses caller-provided resolvedProvider if set, otherwise auto-resolves
+  // from the model name via settings.providers → CHINA_LLM_PROVIDERS →
+  // INTERNATIONAL_PROVIDERS → known patterns → global fallback.
+  const resolvedProvider =
+    options.resolvedProvider ?? resolveModelProvider(options.model)
+  options.resolvedProvider = resolvedProvider
+
   // Derive previous request ID from the last assistant message in this query chain.
   // This is scoped per message array (main thread, subagent, teammate each have their own),
   // so concurrent agents don't clobber each other's request chain tracking.
@@ -1340,7 +1353,7 @@ async function* queryModel(
   // OpenAI-compatible provider: delegate to the OpenAI adapter layer
   // after shared preprocessing (message normalization, tool filtering,
   // media stripping) but before Anthropic-specific logic (betas, thinking, caching).
-  if (getAPIProvider() === 'openai') {
+  if (resolvedProvider.protocol === 'openai') {
     const { queryModelOpenAI } = await import('./openai/index.js')
     // OpenAI emulates Anthropic's dynamic tool loading client-side. It needs
     // the full tool pool so SearchExtraToolsTool can search deferred MCP tools that
@@ -1355,7 +1368,7 @@ async function* queryModel(
     return
   }
 
-  if (getAPIProvider() === 'gemini') {
+  if (resolvedProvider.protocol === 'gemini') {
     const { queryModelGemini } = await import('./gemini/index.js')
     yield* queryModelGemini(
       messagesForAPI,
@@ -1368,7 +1381,7 @@ async function* queryModel(
     return
   }
 
-  if (getAPIProvider() === 'grok') {
+  if (resolvedProvider.protocol === 'grok') {
     const { queryModelGrok } = await import('./grok/index.js')
     yield* queryModelGrok(
       messagesForAPI,
@@ -2362,6 +2375,7 @@ async function* queryModel(
               costUSDForPart,
               usage as unknown as BetaUsage,
               options.model,
+              options.resolvedProvider?.providerId,
             )
 
             const refusalMessage = getErrorMessageIfRefusal(
@@ -2958,6 +2972,7 @@ async function* queryModel(
         fallbackCost,
         fallbackUsage as unknown as BetaUsage,
         options.model,
+        options.resolvedProvider?.providerId,
       )
     }
   }

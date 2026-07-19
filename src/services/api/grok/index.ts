@@ -93,6 +93,8 @@ export async function* queryModelGrok(
       maxRetries: 0,
       fetchOverride: options.fetchOverride as typeof fetch | undefined,
       source: options.querySource,
+      apiKey: options.resolvedProvider?.apiKey,
+      baseUrl: options.resolvedProvider?.baseUrl,
     })
 
     logForDebugging(
@@ -236,6 +238,7 @@ export async function* queryModelGrok(
           costUSD,
           usage as unknown as BetaUsage,
           options.model,
+          options.resolvedProvider?.providerId,
         )
       }
 

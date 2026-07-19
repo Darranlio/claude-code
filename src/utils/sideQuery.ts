@@ -55,6 +55,7 @@ import {
   anthropicToolChoiceToGemini,
   normalizeOpenAIUsage,
 } from '@ant/model-provider'
+import type { ResolvedProvider } from './model/providers.js'
 import type { SystemPrompt } from './systemPromptType.js'
 import type { BetaRawMessageStreamEvent } from '@anthropic-ai/sdk/resources/beta/messages/messages.mjs'
 
@@ -106,6 +107,9 @@ export type SideQueryOptions = {
   /** When true, API failures are recorded as WARNING instead of ERROR in Langfuse.
    *  Use for optional/best-effort queries where failure is expected and handled gracefully. */
   optional?: boolean
+  /** Resolved provider with per-model credentials (multi-provider routing).
+   *  When set, overrides getAPIProvider() for this call. */
+  resolvedProvider?: ResolvedProvider
 }
 
 /**
@@ -192,7 +196,7 @@ export async function sideQuery(opts: SideQueryOptions): Promise<BetaMessage> {
     stop_sequences,
   } = opts
 
-  const provider = getAPIProvider()
+  const provider = opts.resolvedProvider?.protocol ?? getAPIProvider()
   if (provider === 'openai' || provider === 'grok') {
     return sideQueryViaOpenAICompatible(opts)
   }
@@ -643,7 +647,7 @@ async function sideQueryViaOpenAICompatible(
     signal,
   } = opts
 
-  const provider = getAPIProvider()
+  const provider = opts.resolvedProvider?.protocol ?? getAPIProvider()
   const normalizedModel = normalizeModelStringForAPI(model)
 
   // Resolve model name per provider
@@ -686,11 +690,20 @@ async function sideQueryViaOpenAICompatible(
   }
 
   // API-key / OpenAI-compatible / Grok: Chat Completions
+  const resolved = opts.resolvedProvider
   // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   const client: import('openai').default =
     provider === 'grok'
-      ? getGrokClient({ maxRetries: opts.maxRetries ?? 2 })
-      : getOpenAIClient({ maxRetries: opts.maxRetries ?? 2 })
+      ? getGrokClient({
+          maxRetries: opts.maxRetries ?? 2,
+          apiKey: resolved?.apiKey,
+          baseUrl: resolved?.baseUrl,
+        })
+      : getOpenAIClient({
+          maxRetries: opts.maxRetries ?? 2,
+          apiKey: resolved?.apiKey,
+          baseUrl: resolved?.baseUrl,
+        })
 
   const start = Date.now()
 
@@ -907,7 +920,8 @@ async function sideQueryViaGemini(
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': process.env.GEMINI_API_KEY || '',
+      'x-goog-api-key':
+        opts.resolvedProvider?.apiKey ?? (process.env.GEMINI_API_KEY || ''),
     },
     body: JSON.stringify(body),
     signal,

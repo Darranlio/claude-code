@@ -85,6 +85,7 @@ export async function* queryModelGemini(
       model: geminiModel,
       signal,
       fetchOverride: options.fetchOverride as typeof fetch | undefined,
+      apiKey: options.resolvedProvider?.apiKey,
       body: {
         contents,
         ...(systemInstruction && { systemInstruction }),

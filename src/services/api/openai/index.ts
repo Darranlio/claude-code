@@ -391,6 +391,8 @@ export async function* queryModelOpenAI(
             maxRetries: 0,
             fetchOverride: options.fetchOverride as unknown as typeof fetch,
             source: options.querySource,
+            apiKey: options.resolvedProvider?.apiKey,
+            baseUrl: options.resolvedProvider?.baseUrl,
           }).chat.completions.create(
             buildOpenAIRequestBody({
               model: openaiModel,
@@ -520,6 +522,7 @@ export async function* queryModelOpenAI(
               costUSD,
               usage as unknown as BetaUsage,
               options.model,
+              options.resolvedProvider?.providerId,
             )
           }
           break

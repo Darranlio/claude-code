@@ -28,6 +28,8 @@ export async function* streamGeminiGenerateContent(params: {
   body: GeminiGenerateContentRequest
   signal: AbortSignal
   fetchOverride?: typeof fetch
+  /** Per-provider API key (multi-provider support). Falls back to env.GEMINI_API_KEY. */
+  apiKey?: string
 }): AsyncGenerator<GeminiStreamChunk, void> {
   const fetchImpl = params.fetchOverride ?? fetch
   const url = `${getGeminiBaseUrl()}/${getGeminiModelPath(params.model)}:streamGenerateContent?alt=sse`
@@ -36,7 +38,7 @@ export async function* streamGeminiGenerateContent(params: {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-goog-api-key': process.env.GEMINI_API_KEY || '',
+      'x-goog-api-key': params.apiKey ?? (process.env.GEMINI_API_KEY || ''),
     },
     body: JSON.stringify(params.body),
     signal: params.signal,
