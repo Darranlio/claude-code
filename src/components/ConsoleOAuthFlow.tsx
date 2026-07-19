@@ -22,6 +22,7 @@ import { openBrowser } from '../utils/browser.js';
 import { logError } from '../utils/log.js';
 import { getSettings_DEPRECATED, updateSettingsForSource } from '../utils/settings/settings.js';
 import { CHINA_LLM_PROVIDERS, type ProviderPreset, resolveChinaProviderBaseURL } from 'src/utils/chinaLlmProviders.js';
+import { INTERNATIONAL_PROVIDERS } from 'src/utils/internationalProviders.js';
 import { Select } from './CustomSelect/select.js';
 import { Spinner } from './Spinner.js';
 import TextInput from './TextInput.js';
@@ -68,6 +69,7 @@ type OAuthStatus =
       opusModel: string;
       activeField: 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
     } // Gemini Generate Content API platform
+  | { state: 'groq_api'; apiKey: string } // Groq API (OpenAI-compatible, free tier)
   | { state: 'china_provider_select'; activeIndex: number } // China LLM: pick provider
   | { state: 'china_mode_select'; provider: ProviderPreset; activeIndex: number } // China LLM: pick access mode
   | { state: 'china_model_select'; provider: ProviderPreset; mode: 'api' | 'coding-plan'; activeIndex: number } // China LLM: pick model
@@ -84,6 +86,32 @@ type OAuthStatus =
     };
 
 const PASTE_HERE_MSG = 'Paste code here if prompted > ';
+
+/** Save a provider entry to settings.providers alongside existing settings. */
+function saveProviderToSettings(
+  providerId: string,
+  label: string,
+  protocol: 'openai' | 'gemini' | 'grok' | 'firstParty',
+  apiKey: string,
+  baseUrl?: string,
+  models?: string[],
+) {
+  const settings = getSettings_DEPRECATED() || {};
+  const existing = (settings.providers as Record<string, unknown>) || {};
+  const providers = { ...existing } as Record<string, unknown>;
+  providers[providerId] = {
+    id: providerId,
+    label,
+    protocol,
+    apiKey,
+    ...(baseUrl ? { baseUrl } : {}),
+    ...(models?.length ? { models } : {}),
+  };
+  return updateSettingsForSource('userSettings', { providers } as unknown as Parameters<
+    typeof updateSettingsForSource
+  >[1]);
+}
+
 export function ConsoleOAuthFlow({
   onDone,
   startingMessage,
@@ -432,7 +460,14 @@ function OAuthStatusMessage({
   onDone,
 }: OAuthStatusMessageProps): React.ReactNode {
   switch (oauthStatus.state) {
-    case 'idle':
+    case 'idle': {
+      const currentSettings = getSettings_DEPRECATED() || {};
+      const configuredProviders =
+        (currentSettings.providers as Record<
+          string,
+          { id: string; label: string; protocol: string; baseUrl?: string }
+        >) || {};
+      const providerEntries = Object.values(configuredProviders);
       return (
         <Box flexDirection="column" gap={1} marginTop={1}>
           <Text bold>
@@ -440,6 +475,23 @@ function OAuthStatusMessage({
               ? startingMessage
               : `Claude Code can be used with your Claude subscription or billed based on API usage through your Console account.`}
           </Text>
+
+          {providerEntries.length > 0 && (
+            <Box flexDirection="column" marginBottom={1}>
+              <Text bold>Configured Providers:</Text>
+              {providerEntries.map(p => (
+                <Box key={p.id} marginLeft={2}>
+                  <Text>
+                    {p.label} ·{' '}
+                    <Text dimColor>
+                      {p.protocol}
+                      {p.baseUrl ? ` (${p.baseUrl})` : ''}
+                    </Text>
+                  </Text>
+                </Box>
+              ))}
+            </Box>
+          )}
 
           <Text>Select login method:</Text>
 
@@ -463,6 +515,15 @@ function OAuthStatusMessage({
                     </Text>
                   ),
                   value: 'openai_chat_api',
+                },
+                {
+                  label: (
+                    <Text>
+                      Groq API · <Text dimColor>Free tier, ultra-fast LPU inference, 14.4K req/day</Text>
+                      {'\n'}
+                    </Text>
+                  ),
+                  value: 'groq_api',
                 },
                 {
                   label: (
@@ -552,6 +613,12 @@ function OAuthStatusMessage({
                     opusModel: process.env.OPENAI_DEFAULT_OPUS_MODEL ?? '',
                     activeField: 'base_url',
                   });
+                } else if (value === 'groq_api') {
+                  logEvent('tengu_groq_api_selected', {});
+                  setOAuthStatus({
+                    state: 'groq_api',
+                    apiKey: process.env.GROQ_API_KEY ?? '',
+                  });
                 } else if (value === 'china_providers') {
                   logEvent('tengu_china_providers_selected', {});
                   setOAuthStatus({ state: 'china_provider_select', activeIndex: 0 });
@@ -590,6 +657,7 @@ function OAuthStatusMessage({
           </Box>
         </Box>
       );
+    }
 
     case 'custom_platform': {
       type Field = 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
@@ -884,10 +952,22 @@ function OAuthStatusMessage({
         if (finalVals.haiku_model) env.OPENAI_DEFAULT_HAIKU_MODEL = finalVals.haiku_model;
         if (finalVals.sonnet_model) env.OPENAI_DEFAULT_SONNET_MODEL = finalVals.sonnet_model;
         if (finalVals.opus_model) env.OPENAI_DEFAULT_OPUS_MODEL = finalVals.opus_model;
+        const existingProviders = (getSettings_DEPRECATED()?.providers || {}) as Record<string, unknown>;
+        const providers = {
+          ...existingProviders,
+          openai: {
+            id: 'openai',
+            label: 'OpenAI',
+            protocol: 'openai' as const,
+            apiKey: finalVals.api_key ?? '',
+            ...(finalVals.base_url ? { baseUrl: finalVals.base_url } : {}),
+          },
+        };
         const settingsUpdate: Parameters<typeof updateSettingsForSource>[1] = {
           modelType: 'openai',
           env: env as unknown as Record<string, string>,
-        };
+          providers,
+        } as unknown as Parameters<typeof updateSettingsForSource>[1];
         const { error } = updateSettingsForSource('userSettings', settingsUpdate);
         if (error) {
           setOAuthStatus({
@@ -1041,10 +1121,16 @@ function OAuthStatusMessage({
             const env: Record<string, string> = {
               OPENAI_AUTH_MODE: 'chatgpt',
             };
+            const existingProviders = (getSettings_DEPRECATED()?.providers || {}) as Record<string, unknown>;
+            const providers = {
+              ...existingProviders,
+              openai: { id: 'openai', label: 'OpenAI (ChatGPT)', protocol: 'openai' as const, apiKey: '' },
+            };
             const settingsUpdate: Parameters<typeof updateSettingsForSource>[1] = {
               modelType: 'openai',
               env,
-            };
+              providers,
+            } as unknown as Parameters<typeof updateSettingsForSource>[1];
             const { error } = updateSettingsForSource('userSettings', settingsUpdate);
             if (error) {
               throw new Error('Failed to save settings. Please try again.');
@@ -1183,9 +1269,21 @@ function OAuthStatusMessage({
         if (finalVals.haiku_model) env.GEMINI_DEFAULT_HAIKU_MODEL = finalVals.haiku_model;
         if (finalVals.sonnet_model) env.GEMINI_DEFAULT_SONNET_MODEL = finalVals.sonnet_model;
         if (finalVals.opus_model) env.GEMINI_DEFAULT_OPUS_MODEL = finalVals.opus_model;
+        const existingProviders = (getSettings_DEPRECATED()?.providers || {}) as Record<string, unknown>;
+        const providers = {
+          ...existingProviders,
+          gemini: {
+            id: 'gemini',
+            label: 'Google Gemini',
+            protocol: 'gemini' as const,
+            apiKey: finalVals.api_key ?? '',
+            ...(finalVals.base_url ? { baseUrl: finalVals.base_url } : {}),
+          },
+        };
         const { error } = updateSettingsForSource('userSettings', {
           modelType: 'gemini',
           env,
+          providers,
         } as unknown as Parameters<typeof updateSettingsForSource>[1]);
         if (error) {
           setOAuthStatus({
@@ -1299,6 +1397,65 @@ function OAuthStatusMessage({
             {renderGeminiRow('opus_model', 'Opus     ')}
           </Box>
           <Text dimColor>↑↓/Tab to switch · Enter on last field to save · Esc to go back</Text>
+        </Box>
+      );
+    }
+
+    case 'groq_api': {
+      const groqBaseUrl = 'https://api.groq.com/openai/v1';
+      const [groqKey, setGroqKey] = useState(oauthStatus.apiKey);
+      const [groqCursor, setGroqCursor] = useState(oauthStatus.apiKey.length);
+      const [groqSaving, setGroqSaving] = useState(false);
+
+      const handleGroqSave = useCallback(() => {
+        if (!groqKey.trim()) return;
+        setGroqSaving(true);
+        const provider = INTERNATIONAL_PROVIDERS.find(p => p.id === 'groq');
+        const models = provider?.models.map(m => m.id) ?? [];
+        saveProviderToSettings('groq', 'Groq', 'openai', groqKey.trim(), groqBaseUrl, models);
+        // Set env var for backward compat
+        process.env.GROQ_API_KEY = groqKey.trim();
+        process.env.GROQ_BASE_URL = groqBaseUrl;
+        clearOpenAIClientCache();
+        logEvent('tengu_groq_login_success', {});
+        setOAuthStatus({ state: 'success' });
+        void onDone();
+      }, [groqKey, setOAuthStatus, onDone]);
+
+      useKeybinding(
+        'confirm:no',
+        () => {
+          setOAuthStatus({ state: 'idle' });
+        },
+        { context: 'Confirmation' },
+      );
+      useKeybinding('confirm:yes', handleGroqSave, { context: 'Confirmation' });
+
+      return (
+        <Box flexDirection="column" gap={1} marginTop={1}>
+          <Text bold>Groq API Configuration</Text>
+          <Text dimColor>Free tier: 14,400 requests/day, 30K tokens/minute. No credit card required.</Text>
+          <Box flexDirection="column" marginTop={1}>
+            <Text dimColor>Base URL: {groqBaseUrl}</Text>
+            <Text bold>API Key</Text>
+            <Text dimColor>Get your key at https://console.groq.com/keys (format: gsk-...)</Text>
+            <TextInput
+              value={groqKey}
+              onChange={setGroqKey}
+              onSubmit={handleGroqSave}
+              cursorOffset={groqCursor}
+              onChangeCursorOffset={setGroqCursor}
+              columns={textInputColumns}
+              mask={PASTE_HERE_MSG}
+            />
+            {groqSaving && (
+              <Box>
+                <Spinner />
+                <Text>Saving...</Text>
+              </Box>
+            )}
+          </Box>
+          <Text dimColor>Enter to save · Esc to go back</Text>
         </Box>
       );
     }
@@ -1461,10 +1618,23 @@ function OAuthStatusMessage({
           OPENAI_DEFAULT_HAIKU_MODEL: modelId,
           OPENAI_DEFAULT_OPUS_MODEL: modelId,
         };
+        const existingProviders = (getSettings_DEPRECATED()?.providers || {}) as Record<string, unknown>;
+        const providers = {
+          ...existingProviders,
+          [provider.id]: {
+            id: provider.id,
+            label: provider.label,
+            protocol: 'openai' as const,
+            apiKey: chinaKeyValue.trim(),
+            baseUrl,
+            models: provider.models.map(m => m.id),
+          },
+        };
         const settingsUpdate: Parameters<typeof updateSettingsForSource>[1] = {
           modelType: 'openai',
           env: env as unknown as Record<string, string>,
-        };
+          providers,
+        } as unknown as Parameters<typeof updateSettingsForSource>[1];
         const { error } = updateSettingsForSource('userSettings', settingsUpdate);
         if (error) {
           setOAuthStatus({

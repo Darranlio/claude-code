@@ -32,7 +32,7 @@ import {
   modelDisplayString,
   parseUserSpecifiedModel,
 } from '../utils/model/model.js';
-import { getModelOptions } from '../utils/model/modelOptions.js';
+import { getModelOptions, type ModelOption } from '../utils/model/modelOptions.js';
 import { getSettingsForSource, updateSettingsForSource } from '../utils/settings/settings.js';
 import { ConfigurableShortcutHint } from './ConfigurableShortcutHint.js';
 import { Select } from './CustomSelect/index.js';
@@ -125,18 +125,39 @@ export function ModelPicker({
     return modelOptions;
   }, [modelOptions, initial]);
 
-  const selectOptions = useMemo(
-    () =>
-      optionsWithInitial.map(opt => ({
-        ...opt,
-        value: opt.value === null ? NO_PREFERENCE : opt.value,
-      })),
-    [optionsWithInitial],
-  );
-  const initialFocusValue = useMemo(
-    () => (selectOptions.some(_ => _.value === initialValue) ? initialValue : (selectOptions[0]?.value ?? undefined)),
-    [selectOptions, initialValue],
-  );
+  const selectOptions = useMemo(() => {
+    const mapped = optionsWithInitial.map(opt => ({
+      ...opt,
+      value: opt.value === null ? NO_PREFERENCE : opt.value,
+    }));
+
+    // Insert provider group headers between provider groups in the model picker.
+    const grouped: Array<(typeof mapped)[number] & { disabled?: boolean }> = [];
+    let lastProviderId: string | undefined;
+    for (const opt of mapped) {
+      const currentId = (opt as ModelOption).provider?.id;
+      if (currentId && currentId !== lastProviderId) {
+        const p = (opt as ModelOption).provider!;
+        grouped.push({
+          value: `__group__${currentId}`,
+          label: `── ${p.label} ──`,
+          description: `${p.isFree ? 'Free' : 'Paid'} · ${p.priceDisplay}${p.quotaRemaining ? ` · ${p.quotaRemaining}` : ''}`,
+          disabled: true,
+        });
+        lastProviderId = currentId;
+      } else if (!currentId) {
+        lastProviderId = undefined;
+      }
+      grouped.push(opt);
+    }
+    return grouped;
+  }, [optionsWithInitial]);
+  const initialFocusValue = useMemo(() => {
+    if (selectOptions.some(o => o.value === initialValue)) return initialValue;
+    // Skip group headers to find first real option
+    const firstReal = selectOptions.find(o => typeof o.value === 'string' && !o.value.startsWith('__group__'));
+    return firstReal?.value ?? undefined;
+  }, [selectOptions, initialValue]);
   const visibleCount = Math.min(maxVisible, selectOptions.length);
   const hiddenCount = Math.max(0, selectOptions.length - visibleCount);
 
@@ -193,6 +214,8 @@ export function ModelPicker({
   );
 
   function handleSelect(value: string): void {
+    // Skip provider group headers (non-selectable separator rows)
+    if (value.startsWith('__group__')) return;
     logEvent('tengu_model_command_menu_effort', {
       effort: effort as AnalyticsMetadata_I_VERIFIED_THIS_IS_NOT_CODE_OR_FILEPATHS,
     });

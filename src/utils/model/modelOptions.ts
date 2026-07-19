@@ -15,7 +15,7 @@ import {
 } from '../modelCost.js'
 import { getSettings_DEPRECATED } from '../settings/settings.js'
 import { checkOpus1mAccess, checkSonnet1mAccess } from './check1mAccess.js'
-import { getAPIProvider } from './providers.js'
+import { getAPIProvider, getAllConfiguredModels } from './providers.js'
 import { isModelAllowed } from './modelAllowlist.js'
 import {
   getCanonicalName,
@@ -33,6 +33,7 @@ import {
 } from './model.js'
 import { has1mContext } from '../context.js'
 import { getGlobalConfig } from '../config.js'
+
 import {
   CHATGPT_CODEX_DEFAULT_MODEL,
   CHATGPT_CODEX_MODEL_OPTIONS,
@@ -46,6 +47,15 @@ export type ModelOption = {
   label: string
   description: string
   descriptionForModel?: string
+  /** Multi-provider: provider metadata for grouping in the model picker. */
+  provider?: {
+    id: string
+    label: string
+    isFree: boolean
+    priceDisplay: string
+    quotaRemaining?: string
+    strengths: string[]
+  }
 }
 
 export function getDefaultOptionForUser(fastMode = false): ModelOption {
@@ -466,6 +476,8 @@ function getModelOptionsBase(fastMode = false): ModelOption[] {
   } else {
     payg3pOptions.push(getHaikuOption())
   }
+  // Add models from all configured multi-providers (China LLM + International)
+  payg3pOptions.push(...getProviderModelOptions())
   return payg3pOptions
 }
 
@@ -550,6 +562,53 @@ function getKnownModelOption(model: string): ModelOption | null {
     label: marketingName,
     description: model,
   }
+}
+
+/** Build model options from all configured multi-providers (China LLM + International).
+ *  Groups models by provider with metadata (free/paid, pricing, strengths, quota). */
+function getProviderModelOptions(): ModelOption[] {
+  const options: ModelOption[] = []
+  const configuredProviders = getAllConfiguredModels()
+
+  for (const provider of configuredProviders) {
+    for (const model of provider.models) {
+      const isFree =
+        model.free ||
+        (model.inputPricePerMTok === 0 && model.outputPricePerMTok === 0)
+      const priceDisplay = isFree
+        ? 'Free'
+        : `$${model.inputPricePerMTok}/$${model.outputPricePerMTok} per 1M tokens`
+      const quotaParts: string[] = []
+      if (model.freeQuota?.requestsPerDay) {
+        quotaParts.push(
+          `${model.freeQuota.requestsPerDay.toLocaleString()} req/day`,
+        )
+      }
+      if (model.freeQuota?.tokensPerMinute) {
+        quotaParts.push(
+          `${model.freeQuota.tokensPerMinute.toLocaleString()} TPM`,
+        )
+      }
+
+      options.push({
+        value: model.id,
+        label: model.label,
+        description: `${provider.label} · ${model.contextWindow} context · ${isFree ? 'Free tier' : priceDisplay}${model.tags?.length ? ` · ${model.tags.join(', ')}` : ''}`,
+        descriptionForModel: `${model.label} - ${model.inputPricePerMTok === 0 && model.outputPricePerMTok === 0 ? 'free' : 'paid'} model from ${provider.label}, ${model.contextWindow} context`,
+        provider: {
+          id: provider.providerId,
+          label: provider.label,
+          isFree,
+          priceDisplay,
+          quotaRemaining: quotaParts.length
+            ? quotaParts.join(' · ')
+            : undefined,
+          strengths: model.strengths ?? [],
+        },
+      })
+    }
+  }
+  return options
 }
 
 export function getModelOptions(fastMode = false): ModelOption[] {
