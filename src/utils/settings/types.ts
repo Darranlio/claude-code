@@ -372,6 +372,43 @@ export const SettingsSchema = lazySchema(() =>
           'API provider type. "anthropic" uses the Anthropic API (default), "openai" uses the OpenAI Chat Completions API, "gemini" uses the Gemini API, and "grok" uses the xAI Grok API (OpenAI-compatible). ' +
             'When set to "openai", configure OPENAI_API_KEY, OPENAI_BASE_URL, and OPENAI_MODEL. When set to "gemini", configure GEMINI_API_KEY and optional GEMINI_BASE_URL. When set to "grok", configure GROK_API_KEY (or XAI_API_KEY), optional GROK_BASE_URL, GROK_MODEL, and GROK_MODEL_MAP.',
         ),
+      providers: z
+        .record(
+          z.string(),
+          z.object({
+            id: z.string().describe('Provider unique ID'),
+            label: z.string().describe('Display name'),
+            protocol: z
+              .enum(['openai', 'gemini', 'grok', 'firstParty'])
+              .describe('API protocol'),
+            apiKey: z.string().describe('API key for this provider'),
+            baseUrl: z
+              .string()
+              .optional()
+              .describe('Base URL for this provider'),
+            models: z
+              .array(z.string())
+              .optional()
+              .describe('Model IDs owned by this provider'),
+            isDefault: z
+              .boolean()
+              .optional()
+              .describe('Whether this is the default provider'),
+            quotaUsed: z
+              .object({
+                requests: z.number(),
+                tokens: z.number(),
+                resetDate: z.string(),
+              })
+              .optional()
+              .describe('Locally tracked free quota usage'),
+          }),
+        )
+        .optional()
+        .describe(
+          'Multi-provider configuration. When set, resolveModelProvider() uses this ' +
+            'to route models to the correct backend. When unset, falls back to modelType + env vars.',
+        ),
       model: z
         .string()
         .optional()

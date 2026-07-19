@@ -12,6 +12,13 @@ export type ProviderModel = {
   free?: boolean
   tags?: string[]
   deprecated?: string
+  strengths?: string[]
+  weaknesses?: string[]
+  freeQuota?: {
+    requestsPerDay?: number
+    tokensPerMinute?: number
+    tokensPerDay?: number
+  }
 }
 
 export type CodingPlanTier = {
@@ -60,6 +67,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 6,
         contextWindow: '1M',
         tags: ['Recommended', 'Best code'],
+        strengths: ['coding', 'reasoning', 'long-context'],
+        weaknesses: ['cost'],
       },
       {
         id: 'deepseek-v4-flash',
@@ -68,6 +77,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 2,
         contextWindow: '1M',
         tags: ['Fast'],
+        strengths: ['fast', 'cheap', 'long-context'],
+        weaknesses: ['complex-coding'],
       },
     ],
   },
@@ -117,6 +128,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 31.7,
         contextWindow: '203K',
         tags: ['Flagship'],
+        strengths: ['reasoning', 'coding', 'agentic'],
+        weaknesses: ['cost', 'speed'],
       },
       {
         id: 'glm-4.7',
@@ -125,6 +138,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 15.8,
         contextWindow: '205K',
         tags: ['Recommended'],
+        strengths: ['coding', 'cost-effective'],
+        weaknesses: [],
       },
       {
         id: 'glm-4.7-flash',
@@ -134,6 +149,19 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         contextWindow: '203K',
         free: true,
         tags: ['Free forever'],
+        strengths: ['free', 'fast', 'chinese'],
+        weaknesses: ['complex-reasoning'],
+      },
+      {
+        id: 'glm-z1-flash',
+        label: 'GLM-Z1 Flash',
+        inputPricePerMTok: 0,
+        outputPricePerMTok: 0,
+        contextWindow: '203K',
+        free: true,
+        tags: ['Free forever', 'Reasoning'],
+        strengths: ['free', 'deep-reasoning', 'chinese'],
+        weaknesses: ['speed'],
       },
     ],
   },
@@ -170,6 +198,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 10,
         contextWindow: '262K',
         tags: ['Flagship'],
+        strengths: ['reasoning', 'coding', 'chinese'],
+        weaknesses: ['cost'],
       },
       {
         id: 'qwen3.5-plus',
@@ -178,6 +208,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 4.8,
         contextWindow: '1M',
         tags: ['Recommended', 'Value'],
+        strengths: ['cost-effective', 'long-context', 'chinese'],
+        weaknesses: [],
       },
       {
         id: 'qwen3.5-flash',
@@ -186,6 +218,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 2,
         contextWindow: '1M',
         tags: ['Fast'],
+        strengths: ['fast', 'cheap', 'long-context'],
+        weaknesses: ['complex-coding'],
       },
     ],
   },
@@ -242,6 +276,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 6,
         contextWindow: '1M',
         tags: ['Recommended', 'Flagship'],
+        strengths: ['coding', 'agentic', 'long-context'],
+        weaknesses: ['cost'],
       },
       {
         id: 'mimo-v2.5',
@@ -250,6 +286,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 2,
         contextWindow: '1M',
         tags: ['Multimodal'],
+        strengths: ['multimodal', 'cost-effective', 'long-context'],
+        weaknesses: ['coding'],
       },
       {
         id: 'mimo-v2-flash',
@@ -258,6 +296,8 @@ export const CHINA_LLM_PROVIDERS: ProviderPreset[] = [
         outputPricePerMTok: 2.1,
         contextWindow: '256K',
         tags: ['Fast'],
+        strengths: ['fast', 'cheap'],
+        weaknesses: ['complex-coding', 'short-context'],
       },
     ],
   },
