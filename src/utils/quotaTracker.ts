@@ -84,27 +84,32 @@ export function recordQuotaUsage(
   existing.tokens += tokens
   sessionUsage.set(key, existing)
 
-  // Persist to settings.providers (debounced by caller — we just write)
+  // Persist to settings.providers — only if the provider was properly
+  // configured via /login (has apiKey). Otherwise track in-memory only
+  // to avoid creating partial entries that fail schema validation.
   const settings = getSettings_DEPRECATED() || {}
   const existingProviders =
     (settings.providers as Record<string, Record<string, unknown>>) || {}
-  const provider = { ...(existingProviders[providerId] || {}) }
-  const quotaData = provider.quotaUsed as
-    | { requests: number; tokens: number; resetDate: string }
-    | undefined
+  const existingEntry = existingProviders[providerId]
+  if (existingEntry?.apiKey) {
+    const provider = { ...existingEntry }
+    const quotaData = provider.quotaUsed as
+      | { requests: number; tokens: number; resetDate: string }
+      | undefined
 
-  const today = todayResetDate()
-  const shouldReset = !quotaData || quotaData.resetDate !== today
+    const today = todayResetDate()
+    const shouldReset = !quotaData || quotaData.resetDate !== today
 
-  provider.quotaUsed = {
-    requests: shouldReset ? 1 : (quotaData?.requests ?? 0) + 1,
-    tokens: shouldReset ? tokens : (quotaData?.tokens ?? 0) + tokens,
-    resetDate: today,
+    provider.quotaUsed = {
+      requests: shouldReset ? 1 : (quotaData?.requests ?? 0) + 1,
+      tokens: shouldReset ? tokens : (quotaData?.tokens ?? 0) + tokens,
+      resetDate: today,
+    }
+    existingProviders[providerId] = provider
+    updateSettingsForSource('userSettings', {
+      providers: existingProviders,
+    } as unknown as Parameters<typeof updateSettingsForSource>[1])
   }
-  existingProviders[providerId] = provider
-  updateSettingsForSource('userSettings', {
-    providers: existingProviders,
-  } as unknown as Parameters<typeof updateSettingsForSource>[1])
 }
 
 /**
