@@ -75,7 +75,7 @@ export function buildOpenAIRequestBody(params: {
   enableThinking: boolean
   maxTokens: number
   temperatureOverride?: number
-  /** Session-scoped routing key for official OpenAI requests. */
+  /** Override for tests; production uses the current CCB session id. */
   promptCacheKey?: string
 }): ChatCompletionCreateParamsStreaming & {
   thinking?: { type: string }
@@ -98,13 +98,15 @@ export function buildOpenAIRequestBody(params: {
     model,
     messages,
     max_tokens: maxTokens,
-    ...(promptCacheKey && { prompt_cache_key: promptCacheKey }),
     ...(tools.length > 0 && {
       tools,
       ...(toolChoice && { tool_choice: toolChoice }),
     }),
     stream: true,
     stream_options: { include_usage: true },
+    // Only include prompt_cache_key when the caller explicitly provides it.
+    // OpenAI-compatible providers (Groq/DeepSeek) reject this parameter.
+    ...(promptCacheKey != null ? { prompt_cache_key: promptCacheKey } : {}),
     // Enable chain-of-thought output for DeepSeek and MiMo models.
     // When active, temperature/top_p/presence_penalty/frequency_penalty are ignored.
     ...(enableThinking && {
