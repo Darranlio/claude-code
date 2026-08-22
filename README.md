@@ -164,6 +164,52 @@ bun run build
 
 > ℹ️ 支持所有 Anthropic API 兼容服务（如 OpenRouter、AWS Bedrock 代理等），只要接口兼容 Messages API 即可。
 
+## 📦 快速部署到另一台电脑
+
+你的 API Key 和 provider 配置都集中在 `providers.env.sh`（已被 `.gitignore` 忽略，不会进 git），构建产物在 `dist/`。把这两样复制到新电脑即可，无需重新拉仓库、装依赖。
+
+### 方式一：复制构建产物（推荐，最快）
+
+**1. 在旧电脑上打包**
+
+```bash
+bun run build      # 生成 dist/（cli.js + chunk 文件 + vendor 二进制）
+```
+
+**2. 复制到新电脑**
+
+```bash
+scp -r dist/ user@新电脑:/path/to/claude-code/
+scp providers.env.sh user@新电脑:/path/to/claude-code/
+```
+
+**3. 在新电脑上装 Bun 并启动**
+
+```bash
+# 安装 Bun（>= 1.3.11）
+curl -fsSL https://bun.sh/install | bash && exec $SHELL
+
+cd /path/to/claude-code
+
+# 加载配置：把各 provider 的 API Key 写入 ~/.claude/settings.json（依赖 python3）
+source ./providers.env.sh
+
+# 启动
+./dist/cli-bun.js
+```
+
+> `cli-bun.js` / `cli-node.js` 的 shebang 都是 bun，所以新电脑必须装 Bun。`providers.env.sh` 含明文 API Key，务必 `chmod 600`、不要提交到 git。跨系统（如 Linux → macOS）复制时，vendor 原生二进制（ripgrep / audio-capture）不通用，建议在新电脑上重新 `bun run build`。
+
+### 方式二：从 NPM 安装
+
+不需要改源码的话，直接装 npm 包，只复制配置：
+
+```bash
+npm i -g claude-code-best
+scp providers.env.sh user@新电脑:~
+ssh user@新电脑 "source ~/providers.env.sh"
+```
+
 ## Feature Flags
 
 所有功能开关通过 `FEATURE_<FLAG_NAME>=1` 环境变量启用，例如：
