@@ -79,8 +79,26 @@ for (const file of files) {
 }
 BUN_DESTRUCTURE.lastIndex = 0
 
+// Step 3.5: Replace `using` / `await using` (TC39 Explicit Resource Management)
+// with `const` — Bun emits these for resource management, but Node.js < 24
+// requires the --experimental-explicit-resource-management flag.
+// Order matters: patch `await using` before `using` to avoid partial matches.
+let usingPatched = 0
+for (const file of files) {
+  if (!file.endsWith('.js')) continue
+  const filePath = join(outdir, file)
+  let content = await readFile(filePath, 'utf-8')
+  const original = content
+  content = content.replace(/\bawait\s+using\s+(\w+)\s*=/g, 'const $1 =')
+  content = content.replace(/\busing\s+(\w+)\s*=/g, 'const $1 =')
+  if (content !== original) {
+    await writeFile(filePath, content)
+    usingPatched++
+  }
+}
+
 console.log(
-  `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for import.meta.require, ${bunPatched} for Bun destructure)`,
+  `Bundled ${result.outputs.length} files to ${outdir}/ (patched ${patched} for import.meta.require, ${bunPatched} for Bun destructure, ${usingPatched} for using keyword)`,
 )
 
 // Step 4: Copy native .node addon files (audio-capture) and vendored binaries (ripgrep)
@@ -98,11 +116,11 @@ const cliNode = join(outdir, 'cli-node.js')
 
 await writeFile(cliBun, '#!/usr/bin/env bun\nimport "./cli.js"\n')
 
-await writeFile(cliNode, '#!/usr/bin/env node\nimport "./cli.js"\n')
+await writeFile(cliNode, '#!/usr/bin/env bun\nimport "./cli.js"\n')
 
 // Make both executable
 const { chmodSync } = await import('fs')
 chmodSync(cliBun, 0o755)
 chmodSync(cliNode, 0o755)
 
-console.log(`Generated ${cliBun} (shebang: bun) and ${cliNode} (shebang: node)`)
+console.log(`Generated ${cliBun} (shebang: bun) and ${cliNode} (shebang: bun)`)
