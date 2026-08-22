@@ -69,7 +69,6 @@ type OAuthStatus =
       opusModel: string;
       activeField: 'base_url' | 'api_key' | 'haiku_model' | 'sonnet_model' | 'opus_model';
     } // Gemini Generate Content API platform
-  | { state: 'groq_api'; apiKey: string } // Groq API (OpenAI-compatible, free tier)
   | { state: 'china_provider_select'; activeIndex: number } // China LLM: pick provider
   | { state: 'china_mode_select'; provider: ProviderPreset; activeIndex: number } // China LLM: pick access mode
   | { state: 'china_model_select'; provider: ProviderPreset; mode: 'api' | 'coding-plan'; activeIndex: number } // China LLM: pick model
@@ -519,15 +518,6 @@ function OAuthStatusMessage({
                 {
                   label: (
                     <Text>
-                      Groq API · <Text dimColor>Free tier, ultra-fast LPU inference, 14.4K req/day</Text>
-                      {'\n'}
-                    </Text>
-                  ),
-                  value: 'groq_api',
-                },
-                {
-                  label: (
-                    <Text>
                       China LLM Providers · <Text dimColor>DeepSeek, Zhipu GLM, Qwen, MiMo</Text>
                       {'\n'}
                     </Text>
@@ -612,12 +602,6 @@ function OAuthStatusMessage({
                     sonnetModel: process.env.OPENAI_DEFAULT_SONNET_MODEL ?? '',
                     opusModel: process.env.OPENAI_DEFAULT_OPUS_MODEL ?? '',
                     activeField: 'base_url',
-                  });
-                } else if (value === 'groq_api') {
-                  logEvent('tengu_groq_api_selected', {});
-                  setOAuthStatus({
-                    state: 'groq_api',
-                    apiKey: process.env.GROQ_API_KEY ?? '',
                   });
                 } else if (value === 'china_providers') {
                   logEvent('tengu_china_providers_selected', {});
@@ -1397,64 +1381,6 @@ function OAuthStatusMessage({
             {renderGeminiRow('opus_model', 'Opus     ')}
           </Box>
           <Text dimColor>↑↓/Tab to switch · Enter on last field to save · Esc to go back</Text>
-        </Box>
-      );
-    }
-
-    case 'groq_api': {
-      const groqBaseUrl = 'https://api.groq.com/openai/v1';
-      const [groqKey, setGroqKey] = useState(oauthStatus.apiKey);
-      const [groqCursor, setGroqCursor] = useState(oauthStatus.apiKey.length);
-      const [groqSaving, setGroqSaving] = useState(false);
-
-      const handleGroqSave = useCallback(() => {
-        if (!groqKey.trim()) return;
-        setGroqSaving(true);
-        const provider = INTERNATIONAL_PROVIDERS.find(p => p.id === 'groq');
-        const models = provider?.models.map(m => m.id) ?? [];
-        saveProviderToSettings('groq', 'Groq', 'openai', groqKey.trim(), groqBaseUrl, models);
-        // Set env var for backward compat
-        process.env.GROQ_API_KEY = groqKey.trim();
-        process.env.GROQ_BASE_URL = groqBaseUrl;
-        clearOpenAIClientCache();
-        logEvent('tengu_groq_login_success', {});
-        setOAuthStatus({ state: 'success' });
-        void onDone();
-      }, [groqKey, setOAuthStatus, onDone]);
-
-      useKeybinding(
-        'confirm:no',
-        () => {
-          setOAuthStatus({ state: 'idle' });
-        },
-        { context: 'Confirmation' },
-      );
-      useKeybinding('confirm:yes', handleGroqSave, { context: 'Confirmation' });
-
-      return (
-        <Box flexDirection="column" gap={1} marginTop={1}>
-          <Text bold>Groq API Configuration</Text>
-          <Text dimColor>Free tier: 14,400 requests/day, 30K tokens/minute. No credit card required.</Text>
-          <Box flexDirection="column" marginTop={1}>
-            <Text dimColor>Base URL: {groqBaseUrl}</Text>
-            <Text bold>API Key</Text>
-            <Text dimColor>Get your key at https://console.groq.com/keys (format: gsk-...)</Text>
-            <TextInput
-              value={groqKey}
-              onChange={setGroqKey}
-              onSubmit={handleGroqSave}
-              cursorOffset={groqCursor}
-              onChangeCursorOffset={setGroqCursor}
-              columns={textInputColumns}
-            />
-            {groqSaving && (
-              <Box>
-                <Spinner />
-                <Text>Saving...</Text>
-              </Box>
-            )}
-          </Box>
-          <Text dimColor>Enter to save · Esc to go back</Text>
         </Box>
       );
     }

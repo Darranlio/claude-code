@@ -78,12 +78,18 @@ export function resolveModelProvider(model: string): ResolvedProvider {
   if (providers) {
     for (const [, provider] of Object.entries(providers)) {
       if (provider.models?.includes(model)) {
+        // Fallback baseUrl: settings → env.OPENAI_BASE_URL → known preset baseURL
+        const presetBaseURL = [
+          ...CHINA_LLM_PROVIDERS,
+          ...INTERNATIONAL_PROVIDERS,
+        ].find(p => p.id === provider.id)?.baseURL
         return {
           providerId: provider.id,
           label: provider.label,
           protocol: provider.protocol as APIProvider,
           apiKey: provider.apiKey,
-          baseUrl: provider.baseUrl,
+          baseUrl:
+            provider.baseUrl ?? process.env.OPENAI_BASE_URL ?? presetBaseURL,
         }
       }
     }
@@ -108,7 +114,7 @@ export function resolveModelProvider(model: string): ResolvedProvider {
     }
   }
 
-  // 3. Check International presets (Groq, Gemini)
+  // 3. Check International presets (Gemini)
   for (const provider of INTERNATIONAL_PROVIDERS) {
     const matched = provider.models.find(m => m.id === model)
     if (matched) {
@@ -186,7 +192,16 @@ export function getAllConfiguredModels(): {
   }[] = []
   const settings = getInitialSettings()
   const providers = settings.providers as
-    | Record<string, { id: string; apiKey?: string; baseUrl?: string }>
+    | Record<
+        string,
+        {
+          id: string
+          label?: string
+          apiKey?: string
+          baseUrl?: string
+          models?: string[]
+        }
+      >
     | undefined
 
   // Add configured China LLM providers
@@ -209,6 +224,29 @@ export function getAllConfiguredModels(): {
         providerId: provider.id,
         label: provider.label,
         models: provider.models,
+      })
+    }
+  }
+
+  // Add custom providers (e.g. local Docker/Ollama) not in preset lists
+  if (providers) {
+    const knownIds = new Set([
+      ...CHINA_LLM_PROVIDERS.map(p => p.id),
+      ...INTERNATIONAL_PROVIDERS.map(p => p.id),
+    ])
+    for (const [id, provider] of Object.entries(providers)) {
+      if (knownIds.has(id)) continue
+      if (!provider.models || provider.models.length === 0) continue
+      result.push({
+        providerId: id,
+        label: provider.label || id,
+        models: provider.models.map(m => ({
+          id: m,
+          label: m,
+          inputPricePerMTok: 0,
+          outputPricePerMTok: 0,
+          contextWindow: 'Unknown',
+        })),
       })
     }
   }
