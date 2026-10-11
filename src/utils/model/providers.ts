@@ -17,6 +17,8 @@ export type APIProvider =
   | 'gemini'
   | 'grok'
 
+export { isThirdPartyAPIProvider } from './providerClassification.js'
+
 export function getAPIProvider(
   settings: Pick<SettingsJson, 'modelType'> = getInitialSettings(),
 ): APIProvider {

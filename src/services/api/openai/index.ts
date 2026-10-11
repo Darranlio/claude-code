@@ -369,7 +369,9 @@ export async function* queryModelOpenAI(
               tools: openaiTools,
               toolChoice: openaiToolChoice,
               reasoningEffort,
-              promptCacheKey,
+              // ChatGPT OAuth is always official OpenAI, so the key is present;
+              // the ?? only narrows the type for buildResponsesRequest's string param.
+              promptCacheKey: promptCacheKey ?? getOpenAIPromptCacheKey(),
             }),
             signal,
             fetchOverride: options.fetchOverride as unknown as typeof fetch,
